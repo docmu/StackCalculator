@@ -9,8 +9,6 @@
  */
 import java.util.ArrayList;
 public class InfixExpressionEvaluator<T> extends MyStack<T>{
-		
-		public enum Operator{ADD, SUBTRACT, MULTIPLY, DIVIDE, POWER, OPENPARENTHESES, CLOSEPARENTHESES}
 		/**************************************************************
 		 * puts String infix into an array, infixArray
 		 * puts values of that array into ArrayLists depending if it's
@@ -20,142 +18,185 @@ public class InfixExpressionEvaluator<T> extends MyStack<T>{
 		 * returns the final value pushed onto the stack
 		 *************************************************************/
 	    public static double evaluateInfix(String infix, int[] values){
-			String[] infixArray = infix.split(" ");
-			ArrayList<Double> valuesArray = new ArrayList<Double>();
-			ArrayList<Operator> operatorsArray = new ArrayList<Operator>();
+	    	//Note: possible ending garbage indexes
+	    	String[] postfixStr = infixToPostfix(infix);
+	    	
+	    	//stores operands
+	    	MyStack<String> stack = new MyStack<String>();
+	    	
+	    	int i = 0;
+	    	while(!(postfixStr[i].equals(null)) && i < postfixStr.length) {
+	    		//if a number, push onto stack
+	    		if(isNumeric(postfixStr[i])) {
+	    			stack.push(postfixStr[i]);
+	    		    i++;
+	    		    if(i >= postfixStr.length) break;
+	    		}
+	    		//else if a variable,get its value and push onto stack
+	    		else if(isVariable(postfixStr[i])) {
+	    			double value = returnVariableValue(postfixStr[i], values);
+	    			stack.push(Double.toString(value));
+	    		    i++;
+	    		    if(i >= postfixStr.length) break;
+	    		}
+	    		//if operator, pop two values off stack and calculate it with the operator
+	    		//push result onto stack
+	    		if(isOperator(postfixStr[i])) {
+	    			double b = Double.parseDouble(stack.pop());
+	    			double a = Double.parseDouble(stack.pop());
+	    			String op = postfixStr[i]; 
+	    			i++;
+	    			double result = calculate(a,op,b);
+	    			stack.push(Double.toString(result));
+	    			if(i >= postfixStr.length) break;
+	    		}
+	    	}//end while
+	    	
+	    	//this is the final value
+			return Double.parseDouble(stack.pop());
 			
-			int openPar = 0;
-			int closePar = 0;
+		
+	    }//end evaluateInfix
+	    
+	    public static String[] infixToPostfix(String infix) {
+	    	//contains the expression in inix form
+			String[] infixArray = infix.split(" "); 
 			
-			for(int i = 0; i < infixArray.length; i++) { 
-				if((isNumeric(infixArray[i])) || (isVariable(infixArray[i]))) {
-					double number;
-					if(isNumeric(infixArray[i])){
-						number = parseValue(infixArray[i]);
-					}
-					else{
-						number = returnVariableValue(infixArray[i], values);
-					}
-					valuesArray.add(number);
-				}//end if
-				else if(isOperator(infixArray[i])) {
-						Operator op = parseOperator(infixArray[i]);
-						operatorsArray.add(op);
-						if(op.equals(Operator.OPENPARENTHESES)) {
-							openPar++;
-						}
-						else if(op.equals(Operator.CLOSEPARENTHESES)) {
-							closePar++;
-						}
+			//contains the expression in postfix form w/o parenthesis
+			String[] postfixArray = new String[infixArray.length]; 
+			
+			//stores operators
+			MyStack<String> stack = new MyStack<String>();
+			
+			//check if parenthesis are even
+			int open = 0; 
+			int close = 0;
+			
+			//if expression has ( or ), make sure to delete the space for that string in postfixArray
+			int nullCount = 0;
+			
+			for(int i = 0; i < infixArray.length; i++) {
+				if(infixArray[i].contains("(")) {
+					open++;
+					nullCount++;
 				}
-			}//end for
-
-			if (openPar != closePar) {
+				else if(infixArray[i].contains(")")){
+					close++;
+					nullCount++;
+				}
+			}
+			//number of opening parenthesis don't match number of closing parenthesis
+			if(open != close) {
 				throw new IllegalStateException();
 			}
 			
-			MyStack<Operator> operatorStack = new MyStack<Operator>();
-			MyStack<Double> valueStack = new MyStack<Double>();
+			int i = 0; 
+			int j = 0;
 			
-			double first, second, result = 0; 
-			
-			int countValues = 0;
-			int countOp = 0;
-			int count = -1;
-			int valueStackSize = 0;
-			int opStackSize = 0;
-			
-			
-			valueStack.push(valuesArray.get(countValues)); countValues++; count++; valueStackSize++; 
-			operatorStack.push(operatorsArray.get(countOp)); countOp++; count++; opStackSize++; 
-			valueStack.push(valuesArray.get(countValues)); countValues++; count++; valueStackSize++;
-			
-			while((operatorsArray.size() > 1) && (count < infixArray.length - 1)) {
-				if (countOp < operatorsArray.size()) { 
-					
-					while(operatorStack.peek().equals(Operator.OPENPARENTHESES)) {
-						operatorStack.push(operatorsArray.get(countOp)); countOp++; count++; opStackSize++; 
+			while(i < infixArray.length) {
+				//if an operand is found, add it to postfix array
+				if((isNumeric(infixArray[i]) || isVariable(infixArray[i]))) {
+						postfixArray[j] = infixArray[i];
+						i++;
+						j++;
+					//break out of while loop so program doesn't crash when checking infixArray[i]
+					//for i > last index
+					if(i > infixArray.length - 1) break;
+				}
+				
+				//if opening parenthesis found, push onto stack
+				if(infixArray[i].contains("(")) {
+					stack.push(infixArray[i]);
+					i++;
+				}
+				
+				//if a closing parenthesis is found
+				if(infixArray[i].contains(")")) {
+					//while stack is not empty and top of stack is not an opening parenthesis
+					while(!stack.isEmpty() && (!(stack.peek().contains("(")))) {
+						//for cases where there are more than 1 consecutive ) or (
+						//pop them so it doesn't get added to postfix array
+						while(stack.peek().contains(")")){
+							stack.pop();
+						}
+						while(stack.peek().contains("(")){
+							stack.pop();
+						}
+						//pop stack and add its value to postfix array
+						postfixArray[j] = stack.pop();
+						i++;
+						j++;
 					}//end while
-					if((priorityOfOperator(operatorsArray.get(countOp)) <= priorityOfOperator(operatorStack.peek())) && (!(operatorsArray.get(countOp).equals(Operator.CLOSEPARENTHESES)))){ 		
-						second = valueStack.pop(); valueStackSize--; 
-						first = valueStack.pop(); valueStackSize--;
-						Operator op = operatorStack.pop(); opStackSize--;
-						result = calculate(first, op, second); 
-						valueStack.push(result); 
-						operatorStack.push(operatorsArray.get(countOp)); countOp++; count++; 	
-							
-						if ((valueStackSize < 2) && (countValues < valuesArray.size())) {
-								valueStack.push(valuesArray.get(countValues)); countValues++; count++; valueStackSize++;
-						}
-						if((opStackSize < 1) && (countOp < operatorsArray.size())) {
-								operatorStack.push(operatorsArray.get(countOp)); countOp++; count++; opStackSize++;
-						}
-					}//end if
-					else if((priorityOfOperator(operatorsArray.get(countOp)) > priorityOfOperator(operatorStack.peek())) && (!(operatorsArray.get(countOp).equals(Operator.CLOSEPARENTHESES)))) {
-						operatorStack.push(operatorsArray.get(countOp)); countOp++; count++; opStackSize++;
-						valueStack.push(valuesArray.get(countValues)); countValues++; count++; valueStackSize++;
+					//pop left parenthesis and discard
+					stack.pop();
+					
+					//break out of while loop so program doesn't crash when checking infixArray[i]
+					//for i > last index
+					if(i > infixArray.length - 1) break;
+				}//end if
+				
+				//if an operator is found
+				if(isOperator(infixArray[i])) {
+					//if stack is empty or top of stack is an opening parenthesis
+					if(stack.isEmpty() || stack.peek().contains("(")) {
+						//push operator onto stack
+						stack.push(infixArray[i]);
+						i++;
 					}
 					
-					else if(operatorsArray.get(countOp).equals(Operator.CLOSEPARENTHESES)) {
-						
-						operatorStack.push(operatorsArray.get(countOp)); countOp++; count++; opStackSize++;
-						
-						while((!(operatorStack.isEmpty())) && (!(operatorStack.peek().equals(Operator.OPENPARENTHESES)))) {
-							while(operatorStack.peek().equals(Operator.CLOSEPARENTHESES)) {
-								operatorStack.pop(); opStackSize--;
-							}
-							second = valueStack.pop(); valueStackSize--; 
-							first = valueStack.pop(); valueStackSize--; 
-							Operator op = operatorStack.pop(); opStackSize--;
-							result = calculate(first, op, second);
-							valueStack.push(result);
-						}//end while
-						if(operatorStack.peek().equals(Operator.OPENPARENTHESES)){
-							operatorStack.pop(); opStackSize--;
-						}
-						if ((valueStackSize < 2) && (countValues < valuesArray.size())) {
-							valueStack.push(valuesArray.get(countValues)); countValues++; count++; valueStackSize++;
-						}
-						if((opStackSize < 1) && (countOp < operatorsArray.size())) {
-							operatorStack.push(operatorsArray.get(countOp)); countOp++; count++; opStackSize++;
-						}
-						
-					}//end else if
-					
-					}//end if
-				
 					else {
-						count++;
+						/* stack NOT empty &&
+						 * top of stack is NOT an open parenthesis &&
+						 * operator precedence of infixArray[i] <= operator precedence of operator on top of stack
+						 */
+						while(!stack.isEmpty() && (!(stack.peek().contains("(")))
+							&& priorityOfOperator(infixArray[i]) <= priorityOfOperator(stack.peek())) {
+							//pop stack and add value to postfixArray
+							postfixArray[j] = stack.pop();
+							j++;
+						}//end while
+						
+						//push operator onto stack
+						stack.push(infixArray[i]);
+						i++;
 					}
-				
-				}//end while
+					
+				}//end if
+			}//end while
 			
-				while(!(operatorStack.isEmpty())) {
-					second = valueStack.pop();
-					first = valueStack.pop();
-					Operator op = operatorStack.pop();
-					result = calculate(first, op, second);
-					valueStack.push(result);
-				}//end while
-	
-			return valueStack.peek();
-	    }//end evaluateInfix
+			//while stack not empty, pop and add values to postfixArray
+			while(!stack.isEmpty()) {
+				postfixArray[j] = stack.pop();
+				j++;
+			}
+			
+			//edge case for possible trailing garbage null values
+			if(nullCount > 0) {
+				String[] temp = new String[postfixArray.length-nullCount];
+				//new array without trailing null values 
+				for(int z = 0; z < temp.length; z++) {
+					temp[z] = postfixArray[z];
+				}
+				postfixArray = temp;
+			}
+			
+			return postfixArray;
+	    }
+	    
 	    /******************************************************************
-	     * @param left
-	     * @param op
-	     * @param right
 	     * evaluates expression based on the operator passed
 	     *****************************************************************/
-	    private static double calculate(double left, Operator op, double right){
+	    private static double calculate(double left, String op, double right){
 	        switch (op){
-	            case ADD: return left + right;
-	            case SUBTRACT: return left - right;
-	            case MULTIPLY: return left * right;
-	            case DIVIDE: return left / right;
-	            case POWER: return Math.pow(left, right);
+	            case "+": return left + right;
+	            case "-": return left - right;
+	            case "*": return left * right;
+	            case "/": return left / right;
+	            case "^": return Math.pow(left, right);
 	        }
 	        return 0;
-	    }//end calculate
+	    }
+	    
 	    /********************************************
 	     * returns true if string is numeric
 	     *******************************************/
@@ -167,7 +208,8 @@ public class InfixExpressionEvaluator<T> extends MyStack<T>{
 	    	catch(NumberFormatException e) {
 	    		return false;
 	    	}
-	    }//end isNumeric
+	    }
+	    
 	    /************************************************
 	     * returns true if string is a letter variable
 	     ***********************************************/
@@ -178,43 +220,28 @@ public class InfixExpressionEvaluator<T> extends MyStack<T>{
 	    		return true;
 	    	default: return false;
 	    	}
-	    }//end isVariable
+	    }
+	    
 	    /*************************************************
 	     * returns an int value of an operator's priority
 	     ************************************************/
-	    private static int priorityOfOperator(Operator op){
+	    private static int priorityOfOperator(String op){
 	        switch (op){
-	            case ADD: case SUBTRACT: return 1;
-	            case MULTIPLY: case DIVIDE: return 2;
-	            case POWER: return 3;
-	            case CLOSEPARENTHESES: return 4;
-	            case OPENPARENTHESES: return 4;
-	            //case BLANK: return 0;
+	            case "+": case "-": return 1;
+	            case "*": case "/": return 2;
+	            case "^": return 3;
 	        }
-	        return 0;
-	    }//end prorityOfOperator
+	        return -1;
+	    }
+	    
 	    /*******************************************
 	     * parses numeric string to a double
 	     ******************************************/
 	    private static double parseValue(String str) {
 			double value = Double.parseDouble(str);
 			return value;
-		}//end returnDoubleValue    
-	    /*****************************************
-	     * parses string to enum type Operator
-	     ****************************************/
-	    private static Operator parseOperator(String opString) {
-			switch(opString) {
-			case "+": return Operator.ADD;
-			case "-": return Operator.SUBTRACT;
-			case "*": return Operator.MULTIPLY;
-			case "/": return Operator.DIVIDE;
-			case "^": return Operator.POWER;
-			case "(": return Operator.OPENPARENTHESES;
-			case ")": return Operator.CLOSEPARENTHESES;
-			default: return null;
-			}
-		}//end parseOperator
+		} 
+	    
 	    /*****************************************************
 	     * returns true if the String contains an operator
 	     ****************************************************/
@@ -227,7 +254,8 @@ public class InfixExpressionEvaluator<T> extends MyStack<T>{
 			}
 			
 			return false;
-		}//end isOperator
+		}
+	    
 	    /*************************************************************
 	     * returns the double representation of a variable using the
 	     * array of values passed to InfixExpressionEvaluator
@@ -242,5 +270,5 @@ public class InfixExpressionEvaluator<T> extends MyStack<T>{
 			case "f": case "F": return nums[5]; 
 			default: return 0;
 			}
-		}//end returnVariableValue
+		}
 }//end class
